@@ -106,12 +106,12 @@ function optimize(obj::AbstractObjective,
                   _l::Union{Real,AbstractArray},
                   _u::Union{Real,AbstractArray},
                   F::Fminbox{O} = Fminbox(); kwargs...) where {O<:AbstractOptimizer}
-    if !(typeof(_l) isa AbstractArray)
+    if !(typeof(_l) <: AbstractArray)
         l = fill(_l, length(initial_x))
     else
         l = _l
     end
-    if !(typeof(_u) isa AbstractArray)
+    if !(typeof(_u) <: AbstractArray)
         u = fill(_u, length(initial_x))
     else
         u = _u
@@ -127,12 +127,12 @@ function optimize(f,
                   _l::Union{Real,AbstractArray},
                   _u::Union{Real,AbstractArray},
                   F::Fminbox{O} = Fminbox(); kwargs...) where {O<:AbstractOptimizer}
-    if !(typeof(_l) isa AbstractArray)
+    if !(typeof(_l) <: AbstractArray)
         l = fill(_l, length(initial_x))
     else
         l = _l
     end
-    if !(typeof(_u) isa AbstractArray)
+    if !(typeof(_u) <: AbstractArray)
         u = fill(_u, length(initial_x))
     else
         u = _u
