@@ -101,6 +101,7 @@ module Optim
 
     # Constrained optimization
     include("multivariate/solvers/constrained/fminbox.jl")
+    include("multivariate/solvers/constrained/new_fminbox.jl")
 
     # Univariate methods
     include("univariate/solvers/golden_section.jl")
