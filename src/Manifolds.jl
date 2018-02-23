@@ -71,6 +71,33 @@ end
 retract!(S::Sphere, x) = normalize!(x)
 project_tangent!(S::Sphere,g,x) = (g .= g .- real(vecdot(x,g)).*x)
 
+struct Box{T} <: Manifold
+    l::Vector{T}
+    u::Vector{T}
+end
+function retract!(B::Box, x)
+    for i in 1:length(x)
+        if x[i] < B.l[i]
+            x[i] = B.l[i]
+        elseif x[i] > B.u[i]
+            x[i] = B.u[i]
+        end
+    end
+    x
+end
+function project_tangent!(B::Box, g::Vector{T}, x::Vector{T}, grad=true, doit=true) where {T}
+    if doit
+        for i in 1:length(g)
+            if (grad && g[i] < zero(T) || !grad && g[i] > zero(T)) && x[i] >= B.u[i]
+                g[i] = zero(T)
+            elseif (grad && g[i] > zero(T) || !grad && g[i] < zero(T)) && x[i] <= B.l[i]
+                g[i] = zero(T)
+            end
+        end
+    end
+    g
+end
+
 """
 N x n matrices with orthonormal columns, i.e. such that X'X = I.
 Special cases: N x 1 = sphere, N x N = orthogonal/unitary group.

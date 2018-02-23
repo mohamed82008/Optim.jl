@@ -2,6 +2,7 @@ update_g!(d, state, method) = nothing
 function update_g!(d, state, method::M) where M<:Union{FirstOrderOptimizer, Newton}
     # Update the function value and gradient
     value_gradient!(d, state.x)
+    #project_tangent!(method.manifold, real_to_complex(d,gradient(d)), real_to_complex(d,state.x))
 end
 update_fg!(d, state, method) = nothing
 update_fg!(d, state, method::ZerothOrderOptimizer) = value!(d, state.x)
@@ -13,15 +14,14 @@ update_h!(d, state, method::SecondOrderOptimizer) = hessian!(d, state.x)
 
 after_while!(d, state, method, options) = nothing
 
-function optimize(d::D, initial_x::AbstractArray{Tx, N}, method::M,
-                  options::Options = Options(;default_options(method)...),
-                  state = initial_state(method, options, d, complex_to_real(d, initial_x))) where {D<:AbstractObjective, M<:AbstractOptimizer, Tx, N}
+function optimize(d::D, initial_x::Tx, method::M,
+                  options::Options{T, TCallback} = Options(;default_options(method)...), state = initial_state(method, options, d, complex_to_real(d, initial_x))) where {D<:AbstractObjective, M<:AbstractOptimizer, Tx<:AbstractArray, T, TCallback}
     if length(initial_x) == 1 && typeof(method) <: NelderMead
         error("You cannot use NelderMead for univariate problems. Alternatively, use either interval bound univariate optimization, or another method such as BFGS or Newton.")
     end
 
     t0 = time() # Initial time stamp used to control early stopping by options.time_limit
-
+    
     initial_x = complex_to_real(d, initial_x)
 
     n = length(initial_x)
@@ -38,7 +38,8 @@ function optimize(d::D, initial_x::AbstractArray{Tx, N}, method::M,
         false
     else
         gradient!(d, initial_x)
-        vecnorm(gradient(d), Inf) < options.g_tol
+        #project_tangent!(method.manifold, real_to_complex(d,gradient(d)), real_to_complex(d,initial_x))
+        maximum(abs, gradient(d)) < options.g_tol
     end
 
     converged = g_converged
@@ -52,6 +53,7 @@ function optimize(d::D, initial_x::AbstractArray{Tx, N}, method::M,
     while !converged && !stopped && iteration < options.iterations
         iteration += 1
 
+        #retract!(method.manifold, real_to_complex(d,state.x))
         update_state!(d, state, method) && break # it returns true if it's forced by something in update! to stop (eg dx_dg == 0.0 in BFGS, or linesearch errors)
         update_g!(d, state, method)
         x_converged, f_converged,
@@ -79,29 +81,28 @@ function optimize(d::D, initial_x::AbstractArray{Tx, N}, method::M,
 
     # we can just check minimum, as we've earlier enforced same types/eltypes
     # in variables besides the option settings
-    T = typeof(options.f_tol)
     Tf = typeof(value(d))
     f_incr_pick = f_increased && !options.allow_f_increases
 
-    return MultivariateOptimizationResults(method,
-                                        NLSolversBase.iscomplex(d),
-                                        real_to_complex(d, initial_x),
-                                        real_to_complex(d, pick_best_x(f_incr_pick, state)),
-                                        pick_best_f(f_incr_pick, state, d),
-                                        iteration,
-                                        iteration == options.iterations,
-                                        x_converged,
-                                        T(options.x_tol),
-                                        x_abschange(state),
-                                        f_converged,
-                                        T(options.f_tol),
-                                        f_abschange(d, state),
-                                        g_converged,
-                                        T(options.g_tol),
-                                        g_residual(d),
-                                        f_increased,
-                                        tr,
-                                        f_calls(d),
-                                        g_calls(d),
-                                        h_calls(d))
+    return MultivariateOptimizationResults{typeof(method),T,Tx,typeof(x_abschange(state)),Tf,typeof(tr)}(method,
+                NLSolversBase.iscomplex(d),
+                real_to_complex(d, initial_x),
+                real_to_complex(d, pick_best_x(f_incr_pick, state)),
+                pick_best_f(f_incr_pick, state, d),
+                iteration,
+                iteration == options.iterations,
+                x_converged,
+                T(options.x_tol),
+                x_abschange(state),
+                f_converged,
+                T(options.f_tol),
+                f_abschange(d, state),
+                g_converged,
+                T(options.g_tol),
+                g_residual(d),
+                f_increased,
+                tr,
+                f_calls(d),
+                g_calls(d),
+                h_calls(d))
 end

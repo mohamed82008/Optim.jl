@@ -4,7 +4,7 @@ x_abschange(state) = x_abschange(state.x, state.x_previous)
 x_abschange(x, x_previous) = maxdiff(x, x_previous)
 g_residual(d::AbstractObjective) = g_residual(gradient(d))
 g_residual(d::NonDifferentiable) = convert(typeof(value(d)), NaN)
-g_residual(g) = vecnorm(g, Inf)
+g_residual(g) = maximum(abs, g)
 
 # Used by fminbox
 function assess_convergence(x,

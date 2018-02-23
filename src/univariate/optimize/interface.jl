@@ -3,8 +3,8 @@ function optimize(f::F,
      lower::T,
      upper::T;
      method = Brent(),
-     rel_tol::Real = sqrt(eps(T)),
-     abs_tol::Real = eps(T),
+     rel_tol::Real = sqrt(T(eps(T))),
+     abs_tol::Real = T(eps(T)),
      iterations::Integer = 1_000,
      store_trace::Bool = false,
      show_trace::Bool = false,
@@ -33,9 +33,10 @@ function optimize(f::F,
     lower::Union{Integer, Real},
     upper::Union{Integer, Real};
     kwargs...) where F<:Function
-   optimize(f,
-            Float64(lower),
-            Float64(upper);
+    T = promote_type(typeof(lower/1), typeof(upper/1))
+    optimize(f,
+            T(lower),
+            T(upper);
             kwargs...)
 end
 
@@ -44,9 +45,10 @@ function optimize(f::F,
     upper::Union{Integer, Real},
     mo::Union{Brent, GoldenSection};
     kwargs...) where F<:Function
-   optimize(f,
-            Float64(lower),
-            Float64(upper),
+    T = promote_type(typeof(lower/1), typeof(upper/1))
+    optimize(f,
+            T(lower),
+            T(upper),
             mo;
             kwargs...)
 end

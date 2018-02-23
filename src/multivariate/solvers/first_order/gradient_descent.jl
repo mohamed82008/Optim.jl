@@ -28,11 +28,11 @@ Wright (ch. 2.2, 1999) for an explanation of the approach.
 ## References
  - Nocedal, J. and Wright, S. J. (1999), Numerical optimization. Springer Science 35.67-68: 7.
 """
-function GradientDescent(; alphaguess = LineSearches.InitialPrevious(), # TODO: Investigate good defaults.
-                           linesearch = LineSearches.HagerZhang(),      # TODO: Investigate good defaults
+function GradientDescent(::Type{T}=Float64; alphaguess = LineSearches.InitialPrevious{T}(), # TODO: Investigate good defaults.
+                           linesearch = LineSearches.HagerZhang{T}(),      # TODO: Investigate good defaults
                            P = nothing,
                            precondprep = (P, x) -> nothing,
-                           manifold::Manifold=Flat())
+                           manifold::Manifold=Flat()) where {T}
     GradientDescent(alphaguess, linesearch, P, precondprep, manifold)
 end
 
@@ -52,26 +52,33 @@ function initial_state(method::GradientDescent, options, d, initial_x::AbstractA
 
     project_tangent!(method.manifold, real_to_complex(d,gradient(d)), real_to_complex(d,initial_x))
 
-    GradientDescentState(initial_x, # Maintain current state in state.x
-                         similar(initial_x), # Maintain previous state in state.x_previous
+    state = GradientDescentState(initial_x, # Maintain current state in state.x
+                         fill(T(NaN), size(initial_x)...), # Maintain previous state in state.x_previous
                          T(NaN), # Store previous f in state.f_x_previous
-                         similar(initial_x), # Maintain current search direction in state.s
+                         fill(T(NaN), size(d.DF)...), # Maintain current search direction in state.s
                          @initial_linesearch()...) # Maintain a cache for line search results in state.lsr
+    return state
 end
 
-function update_state!(d, state::GradientDescentState{T}, method::GradientDescent) where T
+function update_state!(d, state::GradientDescentState{Tx, T}, method::GradientDescent) where {Tx, T}
+    retract!(method.manifold, real_to_complex(d,state.x))
     value_gradient!(d, state.x)
     # Search direction is always the negative preconditioned gradient
     project_tangent!(method.manifold, real_to_complex(d,gradient(d)), real_to_complex(d,state.x))
     method.precondprep!(method.P, real_to_complex(d,state.x))
     A_ldiv_B!(real_to_complex(d,state.s), method.P, real_to_complex(d,gradient(d)))
-    scale!(state.s,-1)
-    if method.P != nothing
-        project_tangent!(method.manifold, real_to_complex(d,state.s), real_to_complex(d,state.x))
-    end
+
+    project_tangent!(method.manifold, real_to_complex(d,state.s), real_to_complex(d,state.x))
+    scale!(state.s,-T(1))
 
     # Determine the distance of movement along the search line
     lssuccess = perform_linesearch!(state, method, ManifoldObjective(method.manifold, d))
+
+    if !(method.manifold isa Flat)
+        retract!(method.manifold, real_to_complex(d,state.x))
+        f_x_scratch = NLSolversBase.value!(d, state.x)
+        state.lsr.value[end] = f_x_scratch
+    end
 
     # Update current position # x = x + alpha * s
     @. state.x = state.x + state.alpha * state.s

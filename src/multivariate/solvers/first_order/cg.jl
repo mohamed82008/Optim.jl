@@ -77,12 +77,12 @@ Zhang (2006).
  - W. W. Hager and H. Zhang (2006) Algorithm 851: CG_DESCENT, a conjugate gradient method with guaranteed descent. ACM Transactions on Mathematical Software 32: 113-137.
  - W. W. Hager and H. Zhang (2013), The Limited Memory Conjugate Gradient Method. SIAM Journal on Optimization, 23, pp. 2150-2168.
 """
-function ConjugateGradient(; alphaguess = LineSearches.InitialHagerZhang(),
-                             linesearch = LineSearches.HagerZhang(),
-                             eta::Real = 0.4,
+function ConjugateGradient(::Type{T}=Float64; alphaguess = LineSearches.InitialHagerZhang{T}(),
+                             linesearch = LineSearches.HagerZhang{T}(),
+                             eta::Real = T(0.4),
                              P::Any = nothing,
                              precondprep = (P, x) -> nothing,
-                             manifold::Manifold=Flat())
+                             manifold::Manifold=Flat()) where {T}
 
     ConjugateGradient(eta,
                       P, precondprep,
@@ -138,7 +138,7 @@ function initial_state(method::ConjugateGradient, options, d, initial_x)
     ConjugateGradientState(initial_x, # Maintain current state in state.x
                          similar(initial_x), # Maintain previous state in state.x_previous
                          similar(gradient(d)), # Store previous gradient in state.g_previous
-                         T(NaN), # Store previous f in state.f_x_previous
+                         T(Inf), # Store previous f in state.f_x_previous
                          similar(initial_x), # Intermediate value in CG calculation
                          similar(initial_x), # Preconditioned intermediate value in CG calculation
                          pg, # Maintain the preconditioned gradient in pg

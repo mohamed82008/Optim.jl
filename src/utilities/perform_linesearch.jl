@@ -30,7 +30,6 @@ function perform_linesearch!(state, method::M, d) where M
     # Calculate search direction dphi0
     dphi0 = checked_dphi0!(state, d, method)
     phi0  = value(d)
-
     # Refresh the line search cache
     LineSearches.clear!(state.lsr)
     push!(state.lsr, zero(phi0), phi0, dphi0)

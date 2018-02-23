@@ -10,7 +10,7 @@ macro goldensectiontrace()
             update!(tr,
                     iteration,
                     new_minimum,
-                    NaN,
+                    T(NaN),
                     dt,
                     store_trace,
                     show_trace,
@@ -42,8 +42,8 @@ Base.summary(::GoldenSection) = "Golden Section Search"
 
 function optimize(f::F, x_lower::T, x_upper::T,
      mo::GoldenSection;
-     rel_tol::T = sqrt(eps(T)),
-     abs_tol::T = eps(T),
+     rel_tol::T = sqrt(T(eps(T))),
+     abs_tol::T = T(eps(T)),
      iterations::Integer = 1_000,
      store_trace::Bool = false,
      show_trace::Bool = false,
@@ -59,7 +59,7 @@ function optimize(f::F, x_lower::T, x_upper::T,
     initial_lower = x_lower
     initial_upper = x_upper
 
-    golden_ratio::T = 0.5 * (3.0 - sqrt(5.0))
+    golden_ratio::T = T(0.5) * (3 - sqrt(T(5)))
 
     new_minimizer = x_lower + golden_ratio*(x_upper-x_lower)
     new_minimum = f(new_minimizer)
