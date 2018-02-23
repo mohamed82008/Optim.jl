@@ -99,7 +99,7 @@ function trace!(tr, d, state, iteration, method::Newton, options)
         dt["h(x)"] = copy(NLSolversBase.hessian(d))
         dt["Current step size"] = state.alpha
     end
-    g_norm = vecnorm(gradient(d), Inf)
+    g_norm = maximum(abs, gradient(d))
     update!(tr,
             iteration,
             value(d),

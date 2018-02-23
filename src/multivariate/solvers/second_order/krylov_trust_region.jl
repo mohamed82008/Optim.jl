@@ -70,13 +70,13 @@ function trace!(tr, d, state, iteration, method::KrylovTrustRegion, options)
         dt["radius"] = copy(state.radius)
         dt["interior"] = state.interior
         dt["accept_step"] = state.accept_step
-        dt["norm(s)"] = norm(state.s)
+        dt["norm(s)"] = sqrt(mapreduce((x)->(x^2), +, zero(eltype(state.s)), state.s))
         dt["rho"] = state.rho
         dt["m_diff"] = state.m_diff
         dt["f_diff"] = state.f_diff
         dt["cg_iters"] = state.cg_iters
     end
-    g_norm = norm(gradient(d), Inf)
+    g_norm = maximum(abs, gradient(d))
     update!(tr,
             iteration,
             value(d),
@@ -111,7 +111,7 @@ function cg_steihaug!(objective::TwiceDifferentiableHV,
 
         alpha = dot(r, r) / dHd
 
-        if dHd < zero(T) || norm(z .+ alpha .* d) >= state.radius
+        if dHd < zero(T) || sqrt(mapreduce((x)->(x^2), +, zero(T), z .+ alpha .* d)) >= state.radius
             a_ = dot(d, d)
             b_ = 2 * dot(z, d)
             c_ = dot(z, z) - state.radius^2
@@ -148,7 +148,7 @@ function update_state!(objective::TwiceDifferentiableHV,
 
     state.f_diff = value(objective, state.x .+ state.s) - value(objective)
     state.rho = state.f_diff / state.m_diff
-    state.interior = norm(state.s) < T(0.9) * state.radius
+    state.interior = sqrt(mapreduce((x)->(x^2), +, zero(T), (state.s))) < T(0.9) * state.radius
 
     if state.rho < method.rho_lower
         state.radius *= T(0.25)
@@ -181,7 +181,7 @@ function assess_convergence(state::KrylovTrustRegionState, d, options::Options{T
 
     x_converged, f_converged, f_increased, g_converged = false, false, false, false
 
-    if norm(state.s, Inf) < options.x_tol
+    if maximum(abs, state.s) < options.x_tol
         x_converged = true
     end
 
@@ -192,7 +192,7 @@ function assess_convergence(state::KrylovTrustRegionState, d, options::Options{T
         f_converged = true
     end
 
-    if vecnorm(gradient(d), Inf) < options.g_tol
+    if maximum(abs, gradient(d)) < options.g_tol
         g_converged = true
     end
 

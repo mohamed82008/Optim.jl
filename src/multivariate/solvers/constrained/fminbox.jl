@@ -322,7 +322,7 @@ function optimize(
         results.x_converged, results.f_converged, results.g_converged, converged, f_increased = assess_convergence(x, xold, minimum(results), fval0, g, x_tol, f_tol, g_tol)
         f_increased && !allow_f_increases && break
     end
-    #_x_abschange = vecnorm(x - xold)
+
     _x_abschange = maxdiff(x,xold)
     _minimizer = minimizer(results)
     _minimum = minimum(results)

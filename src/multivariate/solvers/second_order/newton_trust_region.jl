@@ -352,7 +352,7 @@ function trace!(tr, d, state, iteration, method::NewtonTrustRegion, options)
         dt["reached_subproblem_solution"] = state.reached_subproblem_solution
         dt["lambda"] = state.lambda
     end
-    g_norm = norm(gradient(d), Inf)
+    g_norm = maximum(gradient(d), abs)
     update!(tr,
             iteration,
             value(d),

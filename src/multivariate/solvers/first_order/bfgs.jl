@@ -141,7 +141,7 @@ function trace!(tr, d, state, iteration, method::BFGS, options)
         dt["~inv(H)"] = copy(state.invH)
         dt["Current step size"] = state.alpha
     end
-    g_norm = vecnorm(gradient(d), Inf)
+    g_norm = maximum(abs, gradient(d))
     update!(tr,
     iteration,
     value(d),
