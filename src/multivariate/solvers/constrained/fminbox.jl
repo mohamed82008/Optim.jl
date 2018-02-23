@@ -155,6 +155,7 @@ function optimize(
         g_tol::Real = sqrt(pt(T1,T2,T3)(eps(pt(T1,T2,T3)))),
         allow_f_increases::Bool = true,
         iterations::Integer = 1_000,
+        successive_f_tol::Int = 0,
         store_trace::Bool = false,
         show_trace::Bool = false,
         extended_trace::Bool = false,
@@ -164,7 +165,7 @@ function optimize(
         mu0::Real = convert(pt(T1,T2,T3), NaN),
         mufactor::Real = convert(pt(T1,T2,T3), 0.0001),
         precondprep = (P, x, l, u, mu) -> precondprepbox!(P, x, l, u, mu),
-        optimizer_o::Options{TO,TCallback} = Options{pt(T1,T2,T3),Void}(x_tol, f_tol, g_tol, 0, 0, 0, allow_f_increases, iterations, store_trace, show_trace, extended_trace, show_every, callback, pt(T1,T2,T3)(NaN)),
+        optimizer_o::Options{TO,TCallback} = Options{pt(T1,T2,T3),Void}(x_tol, f_tol, g_tol, 0, 0, 0, allow_f_increases, successive_f_tol, iterations, store_trace, show_trace, extended_trace, show_every, callback, pt(T1,T2,T3)(NaN)),
         nargs...) where {T1<:AbstractFloat,T2<:AbstractFloat,T3<:AbstractFloat,O<:AbstractOptimizer, TO<:AbstractFloat, TCallback}
 
     O == Newton && warn("Newton is not supported as the inner optimizer. Defaulting to ConjugateGradient.")

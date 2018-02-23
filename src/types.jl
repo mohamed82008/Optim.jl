@@ -46,7 +46,7 @@ function Options(;
     #    show_trace = true
     #end
     T = promote_type(typeof(x_tol), typeof(f_tol), typeof(g_tol))
-    return Options{T,TCallback}(promote(x_tol, f_tol, g_tol)..., f_calls_limit, g_calls_limit, h_calls_limit, allow_f_increases, Int(iterations), store_trace, show_trace, extended_trace, Int(show_every), callback, time_limit)
+    return Options{T,TCallback}(promote(x_tol, f_tol, g_tol)..., f_calls_limit, g_calls_limit, h_calls_limit, allow_f_increases, successive_f_tol, Int(iterations), store_trace, show_trace, extended_trace, Int(show_every), callback, time_limit)
 end
 
 function print_header(options::Options)
