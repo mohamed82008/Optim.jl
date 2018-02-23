@@ -1,7 +1,9 @@
 using Optim, Compat
 using OptimTestProblems
-UP = OptimTestProblems.UnconstrainedProblems
+using OptimTestProblems.MultivariateProblems
+MVP = MultivariateProblems
 using Base.Test
+using Suppressor
 
 debug_printing = false
 
@@ -64,12 +66,13 @@ multivariate_tests = [
     "precon",
     "manifolds",
     "complex",
+    "fdtime",
 ]
 multivariate_tests = map(s->"./multivariate/"*s*".jl", multivariate_tests)
 
-input_tuple(method, prob) = ((UP.objective(prob),),)
-input_tuple(method::Optim.FirstOrderOptimizer, prob) = ((UP.objective(prob),), (UP.objective(prob), UP.gradient(prob)))
-input_tuple(method::Optim.SecondOrderOptimizer, prob) = ((UP.objective(prob),), (UP.objective(prob), UP.gradient(prob)), (UP.objective(prob), UP.gradient(prob), UP.hessian(prob)))
+input_tuple(method, prob) = ((MVP.objective(prob),),)
+input_tuple(method::Optim.FirstOrderOptimizer, prob) = ((MVP.objective(prob),), (MVP.objective(prob), MVP.gradient(prob)))
+input_tuple(method::Optim.SecondOrderOptimizer, prob) = ((MVP.objective(prob),), (MVP.objective(prob), MVP.gradient(prob)), (MVP.objective(prob), MVP.gradient(prob), MVP.hessian(prob)))
 
 function run_optim_tests(method; convergence_exceptions = (),
                          minimizer_exceptions = (),
@@ -81,7 +84,7 @@ function run_optim_tests(method; convergence_exceptions = (),
                          show_trace = false,
                          show_res = false)
     # Loop over unconstrained problems
-    for (name, prob) in OptimTestProblems.UnconstrainedProblems.examples
+    for (name, prob) in MultivariateProblems.UnconstrainedProblems.examples
         if !isfinite(prob.minimum) || !any(isfinite, prob.solutions)
             debug_printing && println("$name has no registered minimum/minimizer. Skipping ...")
             continue
