@@ -147,6 +147,7 @@ include("multivariate/solvers/first_order/ngmres.jl")
 # Constrained optimization
 ## Box constraints
 include("multivariate/solvers/constrained/fminbox.jl")
+include("multivariate/solvers/constrained/fminbox2.jl")
 include("multivariate/solvers/constrained/samin.jl")
 
 # Univariate methods
