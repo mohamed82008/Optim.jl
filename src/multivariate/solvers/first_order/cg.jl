@@ -149,10 +149,15 @@ function update_state!(d, state::ConjugateGradientState, method::ConjugateGradie
         # Maintain a record of the previous gradient
         copy!(state.g_previous, gradient(d))
 
+        all(isfinite, gradient(d)) || (@show gradient(d); error("gradient(d) is inf"))
+
         # Determine the distance of movement along the search line
         lssuccess = perform_linesearch!(state, method, ManifoldObjective(method.manifold, d))
 
         # Update current position # x = x + alpha * s
+        #@show gradient(d)
+        all(isfinite, state.s) || (@show state.x; error("state.s is inf"))
+        isfinite(state.alpha) || (@show state.alpha; error("state.alpha is inf"))
         @. state.x = state.x + state.alpha * state.s
         retract!(method.manifold, state.x)
 
@@ -161,7 +166,7 @@ function update_state!(d, state::ConjugateGradientState, method::ConjugateGradie
         project_tangent!(method.manifold, gradient(d), state.x)
 
         # Check sanity of function and gradient
-        isfinite(value(d)) || error("Non-finite f(x) while optimizing ($(value(d)))")
+        isfinite(value(d)) || (@show state.x; error("Non-finite f(x) while optimizing ($(value(d)))"))
 
         # Determine the next search direction using HZ's CG rule
         #  Calculate the beta factor (HZ2012)
@@ -174,15 +179,23 @@ function update_state!(d, state::ConjugateGradientState, method::ConjugateGradie
         # -----------------
         method.precondprep!(method.P, state.x)
         dPd = real(dot(state.s, method.P, state.s))
+        isnan(dPd) && (@show dPd; error("dPd is nan"))        
         etak = method.eta * real(vecdot(state.s, state.g_previous)) / dPd
         state.y .= gradient(d) .- state.g_previous
         ydots = real(vecdot(state.y, state.s))
         copy!(state.py, state.pg)        # below, store pg - pg_previous in py
         A_ldiv_B!(state.pg, method.P, gradient(d))
         state.py .= state.pg .- state.py
+        isnan(ydots) && (@show ydots; error("ydots is nan"))        
         betak = (real(vecdot(state.y, state.pg)) - real(vecdot(state.y, state.py)) * real(vecdot(gradient(d), state.s)) / ydots) / ydots
-        beta = max(betak, etak)
+        #isnan(betak) && (@show betak, ydots; error("betak is nan"))        
+        beta = NaNMath.max(betak, etak)
+        #beta = max(betak, etak)
+        #isnan(beta) && (beta = zero(beta))
+        isnan(beta) && (@show beta; error("beta is nan"))        
+        any(isnan, state.pg) && (@show state.pg; error("state.pg is nan"))        
         state.s .= beta.*state.s .- state.pg
+        any(isnan, state.s) && (@show state.s; error("state.s is nan"))        
         project_tangent!(method.manifold, state.s, state.x)
         lssuccess == false # break on linesearch error
 end

@@ -82,7 +82,7 @@ const OptimizationTrace{Tf, T} = Vector{OptimizationState{Tf, T}}
 
 abstract type OptimizationResults end
 
-mutable struct MultivariateOptimizationResults{O, T, Tx, Tc, Tf, M} <: OptimizationResults
+mutable struct MultivariateOptimizationResults{O, T, Tx, Tc, Tf} <: OptimizationResults
     method::O
     initial_x::Tx
     minimizer::Tx
@@ -99,7 +99,6 @@ mutable struct MultivariateOptimizationResults{O, T, Tx, Tc, Tf, M} <: Optimizat
     g_tol::T
     g_residual::Tc
     f_increased::Bool
-    trace::M
     f_calls::Int
     g_calls::Int
     h_calls::Int
@@ -176,7 +175,7 @@ function Base.append!(a::MultivariateOptimizationResults, b::MultivariateOptimiz
     a.x_converged = x_converged(b)
     a.f_converged = f_converged(b)
     a.g_converged = g_converged(b)
-    append!(a.trace, b.trace)
+    #append!(a.trace, b.trace)
     a.f_calls += f_calls(b)
     a.g_calls += g_calls(b)
 end

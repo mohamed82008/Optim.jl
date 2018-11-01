@@ -91,15 +91,21 @@ function optimize(d::D, initial_x::Tx, method::M,
     T = typeof(options.f_tol)
     f_incr_pick = f_increased && !options.allow_f_increases
 
-    return MultivariateOptimizationResults(method,
+    O = typeof(method)
+    _x_abschange = x_abschange(state)
+    Tc = typeof(_x_abschange)
+    bestf = pick_best_f(f_incr_pick, state, d)
+    Tf = typeof(bestf)
+    TTr = typeof(tr)
+    return MultivariateOptimizationResults{O, T, Tx, Tc, Tf}(method,
                                         initial_x,
                                         pick_best_x(f_incr_pick, state),
-                                        pick_best_f(f_incr_pick, state, d),
+                                        bestf,
                                         iteration,
                                         iteration == options.iterations,
                                         x_converged,
                                         T(options.x_tol),
-                                        x_abschange(state),
+                                        _x_abschange,
                                         f_converged,
                                         T(options.f_tol),
                                         f_abschange(d, state),
@@ -107,7 +113,6 @@ function optimize(d::D, initial_x::Tx, method::M,
                                         T(options.g_tol),
                                         g_residual(d),
                                         f_increased,
-                                        tr,
                                         f_calls(d),
                                         g_calls(d),
                                         h_calls(d))

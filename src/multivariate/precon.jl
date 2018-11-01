@@ -49,8 +49,8 @@ Base.dot(A::Array, P::Diagonal, B::Array) = vecdot(A, P.diag .* B)
 #  [3] Inverse Diagonal preconditioner
 #      here, P is stored by the entries of its inverse
 #      TODO: maybe implement this in Base?
-mutable struct InverseDiagonal
-   diag
+struct InverseDiagonal{TD}
+   diag::TD
 end
 Base.A_ldiv_B!(out::Array, P::InverseDiagonal, A::Array) = copy!(out, A .* P.diag)
 Base.dot(A::Array, P::InverseDiagonal, B::Vector) = vecdot(A, B ./ P.diag)

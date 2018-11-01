@@ -1,3 +1,36 @@
+using TimerOutputs
+const to = TimerOutput()
+
+struct FminboxWorkspace{T, TX, TP}
+    x::TX
+    xold::TX
+    g::TX
+    gfunc::TX
+    gbarrier::TX
+    P::TP
+    onboundary::BitVector
+    mu::Base.RefValue{T}
+end
+
+function FminboxWorkspace(initial_x::TX) where TX
+    T = eltype(initial_x)
+    x = copy(initial_x)
+    xold = similar(x)
+    g = similar(x)
+    gfunc = similar(x)
+    gbarrier = similar(x)
+    P = InverseDiagonal(similar(initial_x))
+    onboundary = falses(length(initial_x))
+    mu = Ref(zero(T))
+
+    return FminboxWorkspace(x, xold, g, gfunc, gbarrier, P, onboundary, mu)
+end
+
+function initialize!(workspace::FminboxWorkspace, initial_x)
+    workspace.onboundary .= false
+    workspace.x .= initial_x
+end
+
 # Attempt to compute a reasonable default mu: at the starting
 # position, the gradient of the input function should dominate the
 # gradient of the barrier.
@@ -145,7 +178,8 @@ function optimize(f,
                   u::AbstractArray{T},
                   initial_x::AbstractArray{T},
                   F::Fminbox = Fminbox(),
-                  options = Options(); inplace = true, autodiff = :finite) where T<:AbstractFloat
+                  options = Options(), 
+                  workspace::FminboxWorkspace = FminboxWorkspace(initial_x); inplace = true, autodiff = :finite) where T<:AbstractFloat
 
     g! = inplace ? g : (G, x) -> copy!(G, g(x))
     od = OnceDifferentiable(f, g!, initial_x, zero(T))
@@ -158,7 +192,8 @@ function optimize(f,
                   u::AbstractArray{T},
                   initial_x::AbstractArray{T},
                   F::Fminbox = Fminbox(),
-                  options = Options(); inplace = true, autodiff = :finite) where T<:AbstractFloat
+                  options = Options(), 
+                  workspace::FminboxWorkspace = FminboxWorkspace(initial_x); inplace = true, autodiff = :finite) where T<:AbstractFloat
 
     od = OnceDifferentiable(f, initial_x, zero(T); autodiff = autodiff)
     optimize(od, l, u, initial_x, F, options)
@@ -170,26 +205,22 @@ function optimize(
         u::AbstractArray{T},
         initial_x::AbstractArray{T},
         F::Fminbox = Fminbox(),
-        options = Options()) where T<:AbstractFloat
+        options = Options(), 
+        workspace::FminboxWorkspace = FminboxWorkspace(initial_x)) where T<:AbstractFloat
 
-    outer_iterations = options.outer_iterations
-    allow_outer_f_increases = options.allow_outer_f_increases
-    show_trace, store_trace, extended_trace = options.show_trace, options.store_trace, options.extended_trace
-
-    x = copy(initial_x)
+    #reset_timer!(to)
+    @unpack outer_iterations, allow_outer_f_increases, 
+            show_trace, store_trace, extended_trace = options
+    @unpack x, xold, g, gfunc, gbarrier, P, onboundary, mu = workspace
     fbarrier = (gbarrier, x) -> barrier_box(gbarrier, x, l, u)
     fb = (gbarrier, x, gfunc) -> function_barrier(gfunc, gbarrier, x, df.fdf, fbarrier)
-    gfunc = similar(x)
-    gbarrier = similar(x)
-    P = InverseDiagonal(similar(initial_x))
     # to be careful about one special case that might occur commonly
     # in practice: the initial guess x is exactly in the center of the
     # box. In that case, gbarrier is zero. But since the
     # initialization only makes use of the magnitude, we can fix this
     # by using the sum of the absolute values of the contributions
-    # from each edge.
-    boundaryidx = Vector{Int}()
-    for i in eachindex(gbarrier)
+    # from each edge.    
+    #=@timeit to "Init"=# for i in eachindex(gbarrier)
         thisx = x[i]
         thisl = l[i]
         thisu = u[i]
@@ -197,25 +228,25 @@ function optimize(
         if thisx == thisl
             thisx = 0.99*thisl+0.01*thisu
             x[i] = thisx
-            push!(boundaryidx,i)
+            onboundary[i] = true
         elseif thisx == thisu
             thisx = 0.01*thisl+0.99*thisu
             x[i] = thisx
-            push!(boundaryidx,i)
+            onboundary[i] = true
         elseif thisx < thisl || thisx > thisu
             error("Initial x[$(ind2sub(x, i))]=$thisx is outside of [$thisl, $thisu]")
         end
 
         gbarrier[i] = (isfinite(thisl) ? one(T)/(thisx-thisl) : zero(T)) + (isfinite(thisu) ? one(T)/(thisu-thisx) : zero(T))
     end
-    if length(boundaryidx) > 0
-        warn("Initial position cannot be on the boundary of the box. Moving elements to the interior.\nElement indices affected: $boundaryidx")
+    if sum(onboundary) > 0
+        warn("Initial position cannot be on the boundary of the box. Moving elements to the interior.\nElement indices affected: $findin(onboundary, true)")
     end
 
     gradient!(df, x)
     gfunc .= gradient(df)
 
-    mu = Ref(initial_mu(gfunc, gbarrier, T(F.mufactor), T(F.mu0)))
+    mu[] = initial_mu(gfunc, gbarrier, T(F.mufactor), T(F.mu0))
 
     # Use the barrier-aware preconditioner to define
     # barrier-aware optimization method instance (precondition relevance)
@@ -225,10 +256,7 @@ function optimize(
         println("######## fminbox ########")
         println("Initial mu = ", mu[])
     end
-
-    g = similar(x)
-    fval_all = Vector{Vector{T}}(0)
-
+    
     # Count the total number of outer iterations
     iteration = 0
 
@@ -238,13 +266,12 @@ function optimize(
                                (g, x) -> (funcc(g, x); g),
                                funcc, initial_x, zero(T))
 
-    xold = similar(x)
     converged = false
     local results
     first = true
     fval0 = zero(T)
 
-    while !converged && iteration < outer_iterations
+    #=@timeit to "Main loop"=# while !converged && iteration < outer_iterations
         # Increment the number of steps we've had to perform
         iteration += 1
 
@@ -254,7 +281,7 @@ function optimize(
         if show_trace > 0
             println("#### Fminbox #$iteration: Calling optimizer with mu = ", mu[], " ####")
         end
-        resultsnew = optimize(dfbox, x, _optimizer, options)
+        resultsnew = #=@timeit to "Inner optimize"=# optimize(dfbox, x, _optimizer, options)
         if first
             results = resultsnew
             first = false
@@ -281,11 +308,16 @@ function optimize(
         end
     end
 
-    return MultivariateOptimizationResults(F, initial_x, minimizer(results), df.f(minimizer(results)),
+    #display(to)
+    return minimizer(results)
+
+    #=
+    return MultivariateOptimizationResults{typeof(F), T, typeof(initial_x), T, T}(F, initial_x, minimizer(results), df.f(minimizer(results)),
             iteration, results.iteration_converged,
             results.x_converged, results.x_tol, vecnorm(x - xold),
             results.f_converged, results.f_tol, f_abschange(minimum(results), fval0),
             results.g_converged, results.g_tol, vecnorm(g, Inf),
-            results.f_increased, results.trace, results.f_calls,
+            results.f_increased, results.f_calls,
             results.g_calls, results.h_calls)
+    =#
 end

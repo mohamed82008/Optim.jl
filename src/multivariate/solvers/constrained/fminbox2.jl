@@ -1,33 +1,32 @@
 using Parameters, Setfield
 
-struct Fminbox2{O<:AbstractOptimizer} <: AbstractConstrainedOptimizer
+struct Fminbox{O<:AbstractOptimizer} <: AbstractConstrainedOptimizer
     method::O
 end
 
 """
-# Fminbox2
+# Fminbox
 ## Constructor
 ```julia
-Fminbox2(method::T)
+Fminbox(method::T)
 ```
 """
-function Fminbox2(method::O = LBFGS()) where O <: FirstOrderOptimizer
+function Fminbox(method::O = LBFGS()) where O <: FirstOrderOptimizer
     if method isa Newton || method isa NewtonTrustRegion
-        throw(ArgumentError("Newton is not supported as the Fminbox2 optimizer."))
+        throw(ArgumentError("Newton is not supported as the Fminbox optimizer."))
     end
-    _method = @set method.linesearch! = BackTracking(maxstep=1.0)
-    __method = @set _method.alphaguess! = InitialStatic(alpha=1.0)
-    Fminbox2{typeof(__method)}(__method)
+    @assert :alphamax ∈ fieldnames(method.linesearch!)
+    Fminbox{typeof(method)}(method)
 end
 
-Base.summary(F::Fminbox2) = "Fminbox2 with $(summary(F.method))"
+Base.summary(F::Fminbox) = "Fminbox with $(summary(F.method))"
 
 function optimize(f,
                   g,
                   l::AbstractArray{T},
                   u::AbstractArray{T},
                   initial_x::AbstractArray{T},
-                  F::Fminbox2,
+                  F::Fminbox,
                   options = Options(x_tol=sqrt(eps(T)), f_tol=sqrt(eps(T)), g_tol=sqrt(eps(T))); inplace = true, autodiff = :finite) where T<:AbstractFloat
 
     g! = inplace ? g : (G, x) -> copy!(G, g(x))
@@ -40,7 +39,7 @@ function optimize(f,
                   l::AbstractArray{T},
                   u::AbstractArray{T},
                   initial_x::AbstractArray{T},
-                  F::Fminbox2,
+                  F::Fminbox,
                   options = Options(x_tol=sqrt(eps(T)), f_tol=sqrt(eps(T)), g_tol=sqrt(eps(T))); inplace = true, autodiff = :finite) where T<:AbstractFloat
 
     od = OnceDifferentiable(f, initial_x, zero(T); autodiff = autodiff)
@@ -52,7 +51,7 @@ function optimize(
         l::AbstractArray{T},
         u::AbstractArray{T},
         initial_x::AbstractArray{T},
-        F::Fminbox2{<:FirstOrderOptimizer},
+        F::Fminbox{<:FirstOrderOptimizer},
         options = Options(x_tol=sqrt(eps(T)), f_tol=sqrt(eps(T)), g_tol=sqrt(eps(T)))) where {T<:AbstractFloat}
 
     for i in eachindex(initial_x)
@@ -64,18 +63,16 @@ function optimize(
             error("Initial x[$(ind2sub(initial_x, i))]=$thisx is outside of [$thisl, $thisu]")
         end
     end
-    @assert F.method.linesearch! isa BackTracking
-    @assert F.method.alphaguess! isa InitialStatic
     method = F.method
+    TLS = typeof(method.linesearch!)
 
     state = initial_state(method, options, df, initial_x)
     state.s .= .-gradient(df)
     
-    #reset_timer!(to)
-    @unpack outer_iterations, iterations, allow_outer_f_increases, 
-            show_trace, store_trace, extended_trace, callback,
-            successive_f_tol, time_limit, f_calls_limit, g_calls_limit,
-            h_calls_limit, x_tol, f_tol, g_tol = options
+    @unpack outer_iterations, iterations, allow_f_increases, 
+            allow_outer_f_increases, show_trace, store_trace, extended_trace, 
+            callback, successive_f_tol, time_limit, f_calls_limit, 
+            g_calls_limit, h_calls_limit, x_tol, f_tol, g_tol = options
 
     t0 = time() # Initial time stamp used to control early stopping by options.time_limit
 
@@ -103,9 +100,9 @@ function optimize(
         converged && break
 
         # Find the maximum step one can make given the box
-        alpha_max = get_alpha_max(state.x, state.s, l, u)
-        method = @set method.alphaguess! = InitialStatic(alpha=alpha_max)
-        method = @set method.linesearch! = BackTracking(maxstep=alpha_max)
+        alphamax = get_alphamax(state.x, state.s, l, u)
+        alphamax = alphamax - eps(alphamax)
+        method = @set method.linesearch! = TLS(alphamax=alphamax)
 
         # Use optimizer and line search to go to next state within box
         # Also updates state.s
@@ -150,6 +147,7 @@ function optimize(
     TTr = typeof(tr)
     Tx = typeof(initial_x)
 
+    return pick_best_x(f_incr_pick, state)
     return MultivariateOptimizationResults{O, T, Tx, Tc, Tf}(F,
                                         initial_x,
                                         pick_best_x(f_incr_pick, state),
@@ -178,7 +176,7 @@ function project_s!(v, x, mins, maxs)
     v
 end
 
-function get_alpha_max(x, s, mins, maxs)
+function get_alphamax(x, s, mins, maxs)
     m = 100.
     for i in 1:length(x)
         if s[i] < 0

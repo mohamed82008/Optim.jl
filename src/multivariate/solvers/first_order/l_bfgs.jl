@@ -179,7 +179,7 @@ function update_state!(d, state::LBFGSState, method::LBFGS)
     n = length(state.x)
     # Increment the number of steps we've had to perform
     state.pseudo_iteration += 1
-
+    
     project_tangent!(method.manifold, gradient(d), state.x)
 
     # update the preconditioner
